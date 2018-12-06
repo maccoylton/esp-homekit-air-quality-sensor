@@ -7,3 +7,6 @@
 [submodule "components/esp-cjson"]
 	path = components/esp-cjson
 	url = https://github.com/maximkulkin/esp-cjson
+[submodule "components/MQ135"]
+	path = components/MQ135
+	url = https://github.com/GeorgK/MQ135
