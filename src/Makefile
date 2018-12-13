@@ -6,7 +6,7 @@ EXTRA_COMPONENTS = \
 	extras/rboot-ota \
 	$(abspath ../components/esp-wolfssl) \
 	$(abspath ../components/esp-cjson) \
-	$(abspath ../components/esp-homekit)
+	$(abspath ../components/esp-homekit) 
 
 FLASH_SIZE ?= 8
 HOMEKIT_SPI_FLASH_BASE_ADDR ?= 0x8c000
@@ -14,6 +14,8 @@ HOMEKIT_SPI_FLASH_BASE_ADDR ?= 0x8c000
 EXTRA_CFLAGS += -I../.. -DHOMEKIT_SHORT_APPLE_UUIDS -DHOMEKIT_DEBUG
 
 include $(SDK_PATH)/common.mk
+
+LIBS+=m
 
 signature:
 	$(shell /usr/local/opt/openssl/bin/openssl   sha384 -binary -out firmware/main.bin.sig firmware/main.bin)
