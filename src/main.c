@@ -44,6 +44,7 @@
 #include <dht/dht.h>
 #include <udplogger.h>
 #include <stdout_redirect.h>
+#include <led_codes.h>
 
 // add this section to make your device OTA capable
 // create the extra characteristic &ota_trigger, at the end of the primary service (before the NULL)
@@ -53,7 +54,7 @@
 #include "ota-api.h"
 
 // led pin on ESP12F
-const int led_gpio = 2;
+const int LED_GPIO = 2;
 const int button_gpio = 0;
 
 homekit_characteristic_t ota_trigger      = API_OTA_TRIGGER;
@@ -85,6 +86,7 @@ float humidity_value, temperature_value;
 
 
 void identify_task(void *_args) {
+    led_code (LED_GPIO, IDENTIFY_ACCESSORY);
     vTaskDelete(NULL);
 }
 
@@ -93,19 +95,10 @@ void identify(homekit_value_t _value) {
     xTaskCreate(identify_task, "identify", 128, NULL, 2, NULL);
 }
 
-void led_write(bool on) {
-    gpio_write(led_gpio, on ? 0 : 1);
-}
-
 
 void reset_configuration_task() {
     //Flash the LED first before we start the reset
-    for (int i=0; i<10; i++) {
-        led_write(true);
-        vTaskDelay(100 / portTICK_PERIOD_MS);
-        led_write(false);
-        vTaskDelay(100 / portTICK_PERIOD_MS);
-    }
+    led_code (LED_GPIO, WIFI_CONFIG_RESET);
     
 //    printf("Resetting Wifi Config\n");
     
