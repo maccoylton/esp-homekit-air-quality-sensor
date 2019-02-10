@@ -37,11 +37,13 @@
 #include <FreeRTOS.h>
 #include <task.h>
 #include <queue.h>
-#include "button.h"
+#include <button.h>
 #include <esp8266_mq135.h>
 #include <homekit/homekit.h>
 #include <homekit/characteristics.h>
 #include <dht/dht.h>
+#include <udplogger.h>
+#include <stdout_redirect.h>
 
 // add this section to make your device OTA capable
 // create the extra characteristic &ota_trigger, at the end of the primary service (before the NULL)
@@ -74,6 +76,12 @@ homekit_characteristic_t ozone_density			= HOMEKIT_CHARACTERISTIC_( OZONE_DENSIT
 homekit_characteristic_t nitrogen_dioxide_density	= HOMEKIT_CHARACTERISTIC_( NITROGEN_DIOXIDE_DENSITY, 0 );
 homekit_characteristic_t sulphur_dioxide_density	= HOMEKIT_CHARACTERISTIC_( SULPHUR_DIOXIDE_DENSITY, 0 );
 homekit_characteristic_t pm25_density			= HOMEKIT_CHARACTERISTIC_( PM25_DENSITY, 0 );
+homekit_characteristic_t pm10_density                   = HOMEKIT_CHARACTERISTIC_( PM10_DENSITY, 0 );
+homekit_characteristic_t carbon_monoxide_level          = HOMEKIT_CHARACTERISTIC_( CARBON_MONOXIDE_LEVEL, 0 );
+
+
+float humidity_value, temperature_value;
+
 
 
 void identify_task(void *_args) {
@@ -92,7 +100,7 @@ void led_write(bool on) {
 
 void reset_configuration_task() {
     //Flash the LED first before we start the reset
-    for (int i=0; i<3; i++) {
+    for (int i=0; i<10; i++) {
         led_write(true);
         vTaskDelay(100 / portTICK_PERIOD_MS);
         led_write(false);
@@ -153,6 +161,8 @@ homekit_accessory_t *accessories[] = {
 	    &nitrogen_dioxide_density,
 	    &sulphur_dioxide_density,
 	    &pm25_density,
+	    &pm10_density,
+	    &carbon_monoxide_level,
 	    &ota_trigger,
 	    NULL
 	}),	    
@@ -211,11 +221,12 @@ void create_accessory_name() {
 
 void temperature_sensor_task(void *_args) {
 
+    bool success;
+
     gpio_set_pullup(TEMPERATURE_SENSOR_PIN, false, false);
 
-    float humidity_value, temperature_value;
     while (1) {
-        bool success = dht_read_float_data(
+        success = dht_read_float_data(
             DHT_TYPE_DHT22, TEMPERATURE_SENSOR_PIN,
             &humidity_value, &temperature_value
         );
@@ -239,33 +250,74 @@ void temperature_sensor_init() {
     xTaskCreate(temperature_sensor_task, "Temperature", 256, NULL, 2, NULL);
 }
 
+static ssize_t  udplogger_stdout_write(struct _reent *r, int fd, const void *ptr, size_t len) {
+
+        UDPLOG ("Length %d\n", len);
+        UDPLOG (ptr);
+        return len;
+}
 
 void air_quality_sensor_task(void *_args) {
 
 
-    uint16_t air_quality_level;
     while (1) {
-         MQGetReadings();
-         air_quality_level = sdk_system_adc_read();
-         printf("Got air quality level: %u\n", air_quality_level);
-	 air_quality_level = 1;		
-         air_quality.value.int_value = air_quality_level;
-         homekit_characteristic_notify(&air_quality, HOMEKIT_INT(air_quality_level));
-         vTaskDelay(3000 / portTICK_PERIOD_MS);
+        MQGetReadings( temperature_value, humidity_value);
+        printf("Got air quality level: %i\n", air_quality_val);
+
+        if (co_val < *carbon_monoxide_level.min_value ){
+         	co_val = *carbon_monoxide_level.min_value;
+	}
+        if (co_val > *carbon_monoxide_level.max_value ){
+                co_val = *carbon_monoxide_level.max_value;
+        }	
+        carbon_monoxide_level.value.float_value = co_val;
+        if (pm10_val < *pm10_density.min_value ){
+                pm10_val = *pm10_density.min_value;
+        }
+        if (pm10_val > *pm10_density.max_value ){
+                pm10_val = *pm10_density.max_value;
+        }   
+        pm10_density.value.float_value = pm10_val;		
+
+        air_quality.value.int_value = air_quality_val;
+        homekit_characteristic_notify(&carbon_monoxide_level, HOMEKIT_FLOAT(co_val));
+        homekit_characteristic_notify(&pm10_density, HOMEKIT_FLOAT(pm10_val));
+        homekit_characteristic_notify(&air_quality, HOMEKIT_INT(air_quality_val));
+        vTaskDelay(3000 / portTICK_PERIOD_MS);
     }
 }
 
 void air_quality_sensor_init() {
-    xTaskCreate(air_quality_sensor_task, "Air Quality Sensor", 256, NULL, 2, NULL);
+    MQInit();
+    xTaskCreate(air_quality_sensor_task, "Air Quality Sensor", 512, NULL, 2, NULL);
 }
+
 
 
 
 void user_init(void) {
 
     uart_set_baud(0, 115200);
+    xTaskCreate(udplog_send, "logsend", 512, NULL, 4, NULL);
 
+ /*   UDPLOG ("hello world\n\n\n");
 
+    set_write_stdout(udplogger_stdout_write);
+
+    printf ("hello world 2\n");
+    printf ("hello world 3\n");
+    printf ("hello world 4\n");
+    printf ("hello world 5\n");
+    printf ("hello world 6\n");
+    printf ("hello world 7\n");
+    printf ("hello world 8\n");
+    printf ("hello world 9\n");
+
+    set_write_stdout(NULL);
+*/
+    
+    
+    
     create_accessory_name(); 
     air_quality_sensor_init();
     temperature_sensor_init();
@@ -281,3 +333,4 @@ void user_init(void) {
 
     homekit_server_init(&config);
 }
+

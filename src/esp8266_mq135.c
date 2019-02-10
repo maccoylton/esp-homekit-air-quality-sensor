@@ -17,12 +17,14 @@ float Ro = 41763.0;    // this has to be tuned 10K Ohm
 float co_val = 0;
 float lpg_val = 0;
 float pm10_val = 0;
-float ch4_val = 0;
+float methane_val = 0;
 float nh4_val = 0;
+int air_quality_val = 0;
+
 
 unsigned long SLEEP_TIME = 50000; // Sleep time between reads (in milliseconds)
 
-int val = 0;           // variable to store the value coming from the sensor
+float Rs = 0;           // variable to store the value coming from the sensor
 float valMQ =0.0;
 float lastMQ =0.0;
 
@@ -48,25 +50,76 @@ float           NH4Curve[2]    = {102.2348, -2.554241};
 void MQInit(){
 
    Ro = MQCalibration(MQ_SENSOR_ANALOG_PIN);         //Calibrating the sensor. Please make sure the sensor is in clean air 
-   printf ("calibrated value for Ro is %f.2\n", Ro);   //when you perform the calibration  
+   printf ("calibrated value for Ro is %f\n", Ro);   //when you perform the calibration  
 }
 
 
-void MQGetReadings(){
+float get_correction_factor(float temperature, float humidity){
+
+        /* Calculates the correction factor for ambient air temperature and relative humidity
+        * Based on the linearization of the temperature dependency curve
+        * under and above 20 degrees Celsius, asuming a linear dependency on humidity,
+        * provided by Balk77 https://github.com/GeorgK/MQ135/pull/6/files
+        */
+
+
+        if (temperature < 20){
+            return CORA * temperature * temperature - CORB * temperature + CORC - (humidity - 33.0) * CORD;
+	}
+	else {
+        return CORE * temperature + CORF * humidity + CORG;
+	}
+}
+
+
+void MQGetReadings(float temperature, float humidity){
   
-	val = MQRead(MQ_SENSOR_ANALOG_PIN);
-	co_val = MQGetGasPercentage(val/Ro,GAS_CO);
-  	lpg_val = MQGetGasPercentage(val/Ro,GAS_LPG);
-   	pm10_val = MQGetGasPercentage(val/Ro,GAS_PM10);
-   	ch4_val = MQGetGasPercentage(val/Ro,GAS_CH4);
-	nh4_val = MQGetGasPercentage(val/Ro,GAS_NH4);
-	printf("val %i, CO %f, LPG %f, PM10 %f, CH4 %f, NH4 %f\n", val, co_val, lpg_val, pm10_val, ch4_val, nh4_val);
+	float rs_ro_ratio=0;
+	float correction_factor=0;
+
+	Rs = MQRead(MQ_SENSOR_ANALOG_PIN);
+	correction_factor = get_correction_factor(temperature, humidity);
+	Rs = Rs / correction_factor;
+	rs_ro_ratio = Rs/Ro;
+  	printf("RS_RO Ratio is %f\n", rs_ro_ratio);
+	co_val = MQGetGasPercentage(rs_ro_ratio,GAS_CO);
+  	lpg_val = MQGetGasPercentage(rs_ro_ratio,GAS_LPG);
+   	pm10_val = MQGetGasPercentage(rs_ro_ratio,GAS_PM10);
+   	methane_val = MQGetGasPercentage(rs_ro_ratio,GAS_CH4);
+	nh4_val = MQGetGasPercentage(rs_ro_ratio,GAS_NH4);
+
+	air_quality_val =0;
+
+	if (co_val >=15.4 && air_quality_val < 5){
+		air_quality_val = 5;
+	} else if (co_val >= 12.5 && air_quality_val < 4){
+		air_quality_val = 4;
+        } else if (co_val >= 9.5 && air_quality_val < 3){
+                air_quality_val = 3;
+        } else if (co_val >= 4.5 && air_quality_val < 2){
+                air_quality_val = 2;  
+        } else if (air_quality_val == 0){
+                air_quality_val = 1;    
+	}
+		
+        if (pm10_val >= 355 && air_quality_val < 5){
+                air_quality_val = 5;
+        } else if (pm10_val >= 255 && air_quality_val < 4){
+                air_quality_val = 4;
+        } else if (pm10_val >= 155 && air_quality_val < 3){
+                air_quality_val = 3;
+        } else if (pm10_val >= 55 && air_quality_val < 2){
+                air_quality_val = 2;
+        } else if (air_quality_val == 0){
+                air_quality_val = 1;
+        }
+
+	printf("corrcetion factor %f, air_quality_val %i, Rs %f, CO %f, LPG %f, PM10 %f, methane %f, NH4 %f\n", correction_factor, air_quality_val, Rs, co_val, lpg_val, pm10_val, methane_val, nh4_val);
 }
 
 
 
 /****************** MQResistanceCalculation **************************************** 
-Input: raw_adc - raw value read from adc, which represents the voltage Output: the calculated sensor resistance Remarks: The sensor and the load resistor forms 
 Input:   raw_adc - raw value read from adc, which represents the voltage
 Output:  the calculated sensor resistance
 Remarks: The sensor and the load resistor forms a voltage divider. Given the voltage
@@ -93,7 +146,7 @@ float MQCalibration(int mq_pin)
   float val=0;
  
   for (i=0;i<CALIBARAION_SAMPLE_TIMES;i++) {            //take multiple samples
-    val += MQResistanceCalculation((mq_pin));
+    val += MQResistanceCalculation(sdk_system_adc_read());
     vTaskDelay(CALIBRATION_SAMPLE_INTERVAL);
   }
   val = val/CALIBARAION_SAMPLE_TIMES;                   //calculate the average value
@@ -122,8 +175,7 @@ float MQRead(int mq_pin)
     vTaskDelay(READ_SAMPLE_INTERVAL);
   }
  
-  rs = rs/READ_SAMPLE_TIMES;
-
+  rs = rs/READ_SAMPLE_TIMES;	
   
   return rs;  
 }
@@ -160,6 +212,5 @@ Remarks: USing the a * b coeffients in the equation a*x^b the ppm value is deriv
 ************************************************************************************/ 
 int  MQGetPercentage(float rs_ro_ratio, float *pcurve)
 {
-  printf("RS_RO Ratio is %f\n", rs_ro_ratio);
   return pcurve[0] * powf(rs_ro_ratio, pcurve[1]);
 }

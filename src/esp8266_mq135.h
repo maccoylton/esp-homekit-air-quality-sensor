@@ -10,7 +10,7 @@
                                                      //which is derived from the chart in datasheet
 /***********************Software Related Macros************************************/
 #define         CALIBARAION_SAMPLE_TIMES     50    //define how many samples you are going to take in the calibration phase
-#define         CALIBRATION_SAMPLE_INTERVAL  500   //define the time interal(in milisecond) between each samples in the
+#define         CALIBRATION_SAMPLE_INTERVAL  50   //define the time interal(in milisecond) between each samples in the
                                                      //cablibration phase
 #define         READ_SAMPLE_INTERVAL         50    //define how many samples you are going to take in normal operation
 #define         READ_SAMPLE_TIMES            5     //define the time interal(in milisecond) between each samples in 
@@ -21,10 +21,30 @@
 #define         GAS_CH4                      3
 #define         GAS_NH4                      4
 //static const char *GAS_ENUM[5]            ={"LPG", "CO", "PM10", "CH4", "NH4"};
+
+
+/*   Parameters to model temperature and humidity dependence
+*/
+#define     CORA	0.00035
+#define     CORB	0.02718
+#define     CORC	1.39538
+#define	    CORD	0.0018
+#define     CORE	0.003333333
+#define     CORF	-0.001923077
+#define     CORG	1.130128205
+
                                                                                             
+extern float Ro;    // this has to be tuned 10K Ohm
+extern float co_val;
+extern float lpg_val;
+extern float pm10_val;
+extern float methane_val ;
+extern float nh4_val;
+extern int air_quality_val;
+
 void MQInit();
 
-void MQGetReadings();
+void MQGetReadings(float temparature, float humidity);
 
 
 
