@@ -164,10 +164,6 @@ homekit_accessory_t *accessories[] = {
     NULL
 };
 
-homekit_server_config_t config = {
-    .accessories = accessories,
-    .password = "111-11-111"
-};
 
 
 void button_callback(uint8_t gpio, button_event_t event) {
@@ -252,26 +248,26 @@ static ssize_t  udplogger_stdout_write(struct _reent *r, int fd, const void *ptr
 
 void air_quality_sensor_task(void *_args) {
 
-
+    
     while (1) {
         MQGetReadings( temperature_value, humidity_value);
         printf("Got air quality level: %i\n", air_quality_val);
-
+        
         if (co_val < *carbon_monoxide_level.min_value ){
-         	co_val = *carbon_monoxide_level.min_value;
-	}
+            co_val = *carbon_monoxide_level.min_value;
+        }
         if (co_val > *carbon_monoxide_level.max_value ){
-                co_val = *carbon_monoxide_level.max_value;
-        }	
+            co_val = *carbon_monoxide_level.max_value;
+        }
         carbon_monoxide_level.value.float_value = co_val;
         if (pm10_val < *pm10_density.min_value ){
-                pm10_val = *pm10_density.min_value;
+            pm10_val = *pm10_density.min_value;
         }
         if (pm10_val > *pm10_density.max_value ){
-                pm10_val = *pm10_density.max_value;
-        }   
-        pm10_density.value.float_value = pm10_val;		
-
+            pm10_val = *pm10_density.max_value;
+        }
+        pm10_density.value.float_value = pm10_val;
+        
         air_quality.value.int_value = air_quality_val;
         homekit_characteristic_notify(&carbon_monoxide_level, HOMEKIT_FLOAT(co_val));
         homekit_characteristic_notify(&pm10_density, HOMEKIT_FLOAT(pm10_val));
@@ -285,8 +281,20 @@ void air_quality_sensor_init() {
     xTaskCreate(air_quality_sensor_task, "Air Quality Sensor", 512, NULL, 2, NULL);
 }
 
+void on_homekit_event(homekit_event_t event) {
+    if (event == HOMEKIT_EVENT_PAIRING_ADDED) {
+        air_quality_sensor_init();
+        temperature_sensor_init();
+    } else if (event == HOMEKIT_EVENT_PAIRING_REMOVED) {
+        if (!homekit_is_paired())
+            sdk_system_restart();
+    }
+}
 
-
+homekit_server_config_t config = {
+    .accessories = accessories,
+    .password = "111-11-111"
+};
 
 void user_init(void) {
 
@@ -312,8 +320,6 @@ void user_init(void) {
     
     
     create_accessory_name(); 
-    air_quality_sensor_init();
-    temperature_sensor_init();
 
     int c_hash=ota_read_sysparam(&manufacturer.value.string_value,&serial.value.string_value,
                                       &model.value.string_value,&revision.value.string_value);
@@ -324,6 +330,11 @@ void user_init(void) {
         printf("Failed to initialize button\n");
     }
 
+    if (homekit_is_paired()) {
+        air_quality_sensor_init();
+        temperature_sensor_init();
+    }
+    
     homekit_server_init(&config);
 }
 
