@@ -2,11 +2,11 @@
  * Example of using esp-homekit library to implement an air quality sensor usign and MQ135
  *
  * Copyright 2018 David B Brown @maccoylton
- *  
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
  
  * Unless required by applicable law or agreed to in writing, software
@@ -14,8 +14,8 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- * 
- * The use and OTA mechanis created by HomeACcessoryKid 
+ *
+ * The use and OTA mechanis created by HomeACcessoryKid
  *
  */
 
@@ -53,9 +53,13 @@
 
 #include "ota-api.h"
 
-// led pin on ESP12F
-const int LED_GPIO = 2;
+const int LED_GPIO = 13;
 const int button_gpio = 0;
+
+
+/* global varibale to support LEDs set to 0 wehre the LED is connected to GND, 1 where +3.3v */
+int led_off_value=1;
+
 
 homekit_characteristic_t ota_trigger      = API_OTA_TRIGGER;
 homekit_characteristic_t name             = HOMEKIT_CHARACTERISTIC_(NAME, DEVICE_NAME);
@@ -100,11 +104,11 @@ void reset_configuration_task() {
     //Flash the LED first before we start the reset
     led_code (LED_GPIO, WIFI_CONFIG_RESET);
     
-//    printf("Resetting Wifi Config\n");
+    //    printf("Resetting Wifi Config\n");
     
-//    wifi_config_reset();
+    //    wifi_config_reset();
     
-//    vTaskDelay(1000 / portTICK_PERIOD_MS);
+    //    vTaskDelay(1000 / portTICK_PERIOD_MS);
     
     printf("Resetting HomeKit Config\n");
     
@@ -147,18 +151,18 @@ homekit_accessory_t *accessories[] = {
             &current_relative_humidity,
             NULL
         }),
-	HOMEKIT_SERVICE(AIR_QUALITY_SENSOR, .primary=true, .characteristics=(homekit_characteristic_t*[]){
+        HOMEKIT_SERVICE(AIR_QUALITY_SENSOR, .primary=true, .characteristics=(homekit_characteristic_t*[]){
             HOMEKIT_CHARACTERISTIC(NAME, "Air Quality Sensor"),
-	    &air_quality,
-	    &ozone_density,
-	    &nitrogen_dioxide_density,
-	    &sulphur_dioxide_density,
-	    &pm25_density,
-	    &pm10_density,
-	    &carbon_monoxide_level,
-	    &ota_trigger,
-	    NULL
-	}),	    
+            &air_quality,
+            &ozone_density,
+            &nitrogen_dioxide_density,
+            &sulphur_dioxide_density,
+            &pm25_density,
+            &pm10_density,
+            &carbon_monoxide_level,
+            &ota_trigger,
+            NULL
+        }),
         NULL
     }),
     NULL
@@ -169,10 +173,10 @@ homekit_accessory_t *accessories[] = {
 void button_callback(uint8_t gpio, button_event_t event) {
     switch (event) {
         case button_event_single_press:
-	    printf("Button event: %d, doing nothin\n", event);
+            printf("Button event: %d, doing nothin\n", event);
             break;
         case button_event_long_press:
-	    printf("Button event: %d, resetting homekit config\n", event);
+            printf("Button event: %d, resetting homekit config\n", event);
             reset_configuration();
             break;
         default:
@@ -181,53 +185,53 @@ void button_callback(uint8_t gpio, button_event_t event) {
 }
 
 void create_accessory_name() {
-
+    
     int serialLength = snprintf(NULL, 0, "%d", sdk_system_get_chip_id());
-
+    
     char *serialNumberValue = malloc(serialLength + 1);
-
+    
     snprintf(serialNumberValue, serialLength + 1, "%d", sdk_system_get_chip_id());
     
     int name_len = snprintf(NULL, 0, "%s-%s-%s",
-				DEVICE_NAME,
-				DEVICE_MODEL,
-				serialNumberValue);
-
+                            DEVICE_NAME,
+                            DEVICE_MODEL,
+                            serialNumberValue);
+    
     if (name_len > 63) {
         name_len = 63;
     }
-
+    
     char *name_value = malloc(name_len + 1);
-
+    
     snprintf(name_value, name_len + 1, "%s-%s-%s",
-		 DEVICE_NAME, DEVICE_MODEL, serialNumberValue);
-
-   
+             DEVICE_NAME, DEVICE_MODEL, serialNumberValue);
+    
+    
     name.value = HOMEKIT_STRING(name_value);
     serial.value = name.value;
 }
 
 
 void temperature_sensor_task(void *_args) {
-
+    
     bool success;
-
+    
     gpio_set_pullup(TEMPERATURE_SENSOR_PIN, false, false);
-
+    
     while (1) {
         success = dht_read_float_data(
-            DHT_TYPE_DHT22, TEMPERATURE_SENSOR_PIN,
-            &humidity_value, &temperature_value
-        );
-
+                                      DHT_TYPE_DHT22, TEMPERATURE_SENSOR_PIN,
+                                      &humidity_value, &temperature_value
+                                      );
+        
         if (success) {
             printf("Got readings: temperature %g, humidity %g\n", temperature_value, humidity_value);
             current_temperature.value = HOMEKIT_FLOAT(temperature_value);
             current_relative_humidity.value = HOMEKIT_FLOAT(humidity_value);
-
+            
             homekit_characteristic_notify(&current_temperature, current_temperature.value);
             homekit_characteristic_notify(&current_relative_humidity, current_relative_humidity.value);
-
+            
         } else {
             printf("Couldnt read data from sensor\n");
         }
@@ -240,14 +244,14 @@ void temperature_sensor_init() {
 }
 
 static ssize_t  udplogger_stdout_write(struct _reent *r, int fd, const void *ptr, size_t len) {
-
-        UDPLOG ("Length %d\n", len);
-        UDPLOG (ptr);
-        return len;
+    
+    UDPLOG ("Length %d\n", len);
+    UDPLOG (ptr);
+    return len;
 }
 
 void air_quality_sensor_task(void *_args) {
-
+    
     
     while (1) {
         MQGetReadings( temperature_value, humidity_value);
@@ -281,10 +285,16 @@ void air_quality_sensor_init() {
     xTaskCreate(air_quality_sensor_task, "Air Quality Sensor", 512, NULL, 2, NULL);
 }
 
+void accessory_init(){
+    air_quality_sensor_init();
+    temperature_sensor_init();
+    gpio_enable(LED_GPIO, GPIO_OUTPUT);
+    gpio_write(LED_GPIO, led_off_value);
+}
+
 void on_homekit_event(homekit_event_t event) {
     if (event == HOMEKIT_EVENT_PAIRING_ADDED) {
-        air_quality_sensor_init();
-        temperature_sensor_init();
+        accessory_init();
     } else if (event == HOMEKIT_EVENT_PAIRING_REMOVED) {
         if (!homekit_is_paired())
             sdk_system_restart();
@@ -297,42 +307,41 @@ homekit_server_config_t config = {
 };
 
 void user_init(void) {
-
+    
     uart_set_baud(0, 115200);
     xTaskCreate(udplog_send, "logsend", 512, NULL, 4, NULL);
-
- /*   UDPLOG ("hello world\n\n\n");
-
-    set_write_stdout(udplogger_stdout_write);
-
-    printf ("hello world 2\n");
-    printf ("hello world 3\n");
-    printf ("hello world 4\n");
-    printf ("hello world 5\n");
-    printf ("hello world 6\n");
-    printf ("hello world 7\n");
-    printf ("hello world 8\n");
-    printf ("hello world 9\n");
-
-    set_write_stdout(NULL);
-*/
+    
+    /*   UDPLOG ("hello world\n\n\n");
+     
+     set_write_stdout(udplogger_stdout_write);
+     
+     printf ("hello world 2\n");
+     printf ("hello world 3\n");
+     printf ("hello world 4\n");
+     printf ("hello world 5\n");
+     printf ("hello world 6\n");
+     printf ("hello world 7\n");
+     printf ("hello world 8\n");
+     printf ("hello world 9\n");
+     
+     set_write_stdout(NULL);
+     */
     
     
     
-    create_accessory_name(); 
-
+    create_accessory_name();
+    
     int c_hash=ota_read_sysparam(&manufacturer.value.string_value,&serial.value.string_value,
-                                      &model.value.string_value,&revision.value.string_value);
+                                 &model.value.string_value,&revision.value.string_value);
     if (c_hash==0) c_hash=1;
-        config.accessories[0]->config_number=c_hash;
-
+    config.accessories[0]->config_number=c_hash;
+    
     if (button_create(button_gpio, 0, 4000, button_callback)) {
         printf("Failed to initialize button\n");
     }
-
+    
     if (homekit_is_paired()) {
-        air_quality_sensor_init();
-        temperature_sensor_init();
+        accessory_init();
     }
     
     homekit_server_init(&config);
