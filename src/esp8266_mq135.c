@@ -19,7 +19,7 @@ float lpg_val = 0;
 float pm10_val = 0;
 float methane_val = 0;
 float nh4_val = 0;
-int air_quality_val = 0;
+uint8_t air_quality_val = 0;
 
 
 unsigned long SLEEP_TIME = 50000; // Sleep time between reads (in milliseconds)

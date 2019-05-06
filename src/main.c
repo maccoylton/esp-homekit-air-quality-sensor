@@ -45,6 +45,8 @@
 #include <udplogger.h>
 #include <stdout_redirect.h>
 #include <led_codes.h>
+#include <custom_characteristics.h>
+
 
 // add this section to make your device OTA capable
 // create the extra characteristic &ota_trigger, at the end of the primary service (before the NULL)
@@ -55,6 +57,7 @@
 
 const int LED_GPIO = 13;
 const int button_gpio = 0;
+int button_pressed_value=0; /*set to o when botton is connect to gound, 1 when button is providing +3.3V */
 
 
 /* global varibale to support LEDs set to 0 wehre the LED is connected to GND, 1 where +3.3v */
@@ -76,13 +79,18 @@ homekit_characteristic_t current_temperature = HOMEKIT_CHARACTERISTIC_( CURRENT_
 homekit_characteristic_t current_relative_humidity    = HOMEKIT_CHARACTERISTIC_( CURRENT_RELATIVE_HUMIDITY, 0 );
 
 //air quality sensor
-homekit_characteristic_t air_quality			= HOMEKIT_CHARACTERISTIC_( AIR_QUALITY, 0 );
-homekit_characteristic_t ozone_density			= HOMEKIT_CHARACTERISTIC_( OZONE_DENSITY, 0 );
+homekit_characteristic_t air_quality                = HOMEKIT_CHARACTERISTIC_( AIR_QUALITY, 0 );
+homekit_characteristic_t ozone_density              = HOMEKIT_CHARACTERISTIC_( OZONE_DENSITY, 0 );
 homekit_characteristic_t nitrogen_dioxide_density	= HOMEKIT_CHARACTERISTIC_( NITROGEN_DIOXIDE_DENSITY, 0 );
 homekit_characteristic_t sulphur_dioxide_density	= HOMEKIT_CHARACTERISTIC_( SULPHUR_DIOXIDE_DENSITY, 0 );
-homekit_characteristic_t pm25_density			= HOMEKIT_CHARACTERISTIC_( PM25_DENSITY, 0 );
-homekit_characteristic_t pm10_density                   = HOMEKIT_CHARACTERISTIC_( PM10_DENSITY, 0 );
-homekit_characteristic_t carbon_monoxide_level          = HOMEKIT_CHARACTERISTIC_( CARBON_MONOXIDE_LEVEL, 0 );
+homekit_characteristic_t pm25_density               = HOMEKIT_CHARACTERISTIC_( PM25_DENSITY, 0 );
+homekit_characteristic_t pm10_density               = HOMEKIT_CHARACTERISTIC_( PM10_DENSITY, 0 );
+homekit_characteristic_t carbon_monoxide_level      = HOMEKIT_CHARACTERISTIC_( CARBON_MONOXIDE_LEVEL, 0 );
+
+homekit_characteristic_t lpg_level                  = HOMEKIT_CHARACTERISTIC_( CUSTOM_LPG_LEVEL, 0 );
+homekit_characteristic_t methane_level              = HOMEKIT_CHARACTERISTIC_( CUSTOM_METHANE_LEVEL, 0 );
+homekit_characteristic_t ammonium_level             = HOMEKIT_CHARACTERISTIC_( CUSTOM_AMMONIUM_LEVEL, 0 );
+
 
 
 float humidity_value, temperature_value;
@@ -160,6 +168,9 @@ homekit_accessory_t *accessories[] = {
             &pm25_density,
             &pm10_density,
             &carbon_monoxide_level,
+            &lpg_level,
+            &methane_level,
+            &ammonium_level,
             &ota_trigger,
             NULL
         }),
@@ -173,14 +184,17 @@ homekit_accessory_t *accessories[] = {
 void button_callback(uint8_t gpio, button_event_t event) {
     switch (event) {
         case button_event_single_press:
-            printf("Button event: %d, doing nothin\n", event);
+            printf("\n\n***Button single press event: %d, doing nothin\n", event);
+            break;
+        case button_event_double_press:
+            printf("\n\n***Button double press event: %d, doing nothin\n", event);
             break;
         case button_event_long_press:
-            printf("Button event: %d, resetting homekit config\n", event);
+            printf("\n\n***Button long press event: %d, resetting homekit config\n", event);
             reset_configuration();
             break;
         default:
-            printf("Unknown button event: %d\n", event);
+            printf("\n\n***Unknown button event: %d\n", event);
     }
 }
 
@@ -233,6 +247,7 @@ void temperature_sensor_task(void *_args) {
             homekit_characteristic_notify(&current_relative_humidity, current_relative_humidity.value);
             
         } else {
+            led_code(LED_GPIO, SENSOR_ERROR);
             printf("Couldnt read data from sensor\n");
         }
         vTaskDelay(TEMPERATURE_POLL_PERIOD / portTICK_PERIOD_MS);
@@ -264,6 +279,7 @@ void air_quality_sensor_task(void *_args) {
             co_val = *carbon_monoxide_level.max_value;
         }
         carbon_monoxide_level.value.float_value = co_val;
+        
         if (pm10_val < *pm10_density.min_value ){
             pm10_val = *pm10_density.min_value;
         }
@@ -272,28 +288,58 @@ void air_quality_sensor_task(void *_args) {
         }
         pm10_density.value.float_value = pm10_val;
         
+        
+        if (lpg_val < *lpg_level.min_value ){
+            lpg_val = *lpg_level.min_value;
+        }
+        if (lpg_val > *lpg_level.max_value ){
+            lpg_val = *lpg_level.max_value;
+        }
+        lpg_level.value.float_value = lpg_val;
+        
+        if (methane_val < *methane_level.min_value ){
+            methane_val = *methane_level.min_value;
+        }
+        if (methane_val > *methane_level.max_value ){
+            methane_val = *methane_level.max_value;
+        }
+        methane_level.value.float_value = methane_val;
+        
+        if (nh4_val < *ammonium_level.min_value ){
+            nh4_val = *ammonium_level.min_value;
+        }
+        if (nh4_val > *ammonium_level.max_value ){
+            nh4_val = *ammonium_level.max_value;
+        }
+        ammonium_level.value.float_value = nh4_val;
+        
         air_quality.value.int_value = air_quality_val;
         homekit_characteristic_notify(&carbon_monoxide_level, HOMEKIT_FLOAT(co_val));
         homekit_characteristic_notify(&pm10_density, HOMEKIT_FLOAT(pm10_val));
-        homekit_characteristic_notify(&air_quality, HOMEKIT_INT(air_quality_val));
+        homekit_characteristic_notify(&air_quality, air_quality.value);
+        homekit_characteristic_notify(&carbon_monoxide_level, HOMEKIT_FLOAT(lpg_val));
+        homekit_characteristic_notify(&carbon_monoxide_level, HOMEKIT_FLOAT(lpg_val));
+        homekit_characteristic_notify(&carbon_monoxide_level, HOMEKIT_FLOAT(lpg_val));
         vTaskDelay(3000 / portTICK_PERIOD_MS);
     }
 }
 
 void air_quality_sensor_init() {
+    led_code (LED_GPIO,FUNCTION_D );
     MQInit();
     xTaskCreate(air_quality_sensor_task, "Air Quality Sensor", 512, NULL, 2, NULL);
 }
 
 void accessory_init(){
-    air_quality_sensor_init();
-    temperature_sensor_init();
     gpio_enable(LED_GPIO, GPIO_OUTPUT);
     gpio_write(LED_GPIO, led_off_value);
+    air_quality_sensor_init();
+    temperature_sensor_init();
 }
 
 void on_homekit_event(homekit_event_t event) {
     if (event == HOMEKIT_EVENT_PAIRING_ADDED) {
+        printf("Pairing added so init accessory\n");
         accessory_init();
     } else if (event == HOMEKIT_EVENT_PAIRING_REMOVED) {
         if (!homekit_is_paired())
@@ -303,7 +349,8 @@ void on_homekit_event(homekit_event_t event) {
 
 homekit_server_config_t config = {
     .accessories = accessories,
-    .password = "111-11-111"
+    .password = "111-11-111",
+    .on_event = on_homekit_event
 };
 
 void user_init(void) {
@@ -336,11 +383,12 @@ void user_init(void) {
     if (c_hash==0) c_hash=1;
     config.accessories[0]->config_number=c_hash;
     
-    if (button_create(button_gpio, 0, 4000, button_callback)) {
+    if (button_create(button_gpio, button_callback)) {
         printf("Failed to initialize button\n");
     }
     
     if (homekit_is_paired()) {
+        printf("Pairing in place so init accessory\n");
         accessory_init();
     }
     

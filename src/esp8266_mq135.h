@@ -10,7 +10,7 @@
                                                      //which is derived from the chart in datasheet
 /***********************Software Related Macros************************************/
 #define         CALIBARAION_SAMPLE_TIMES     50    //define how many samples you are going to take in the calibration phase
-#define         CALIBRATION_SAMPLE_INTERVAL  50   //define the time interal(in milisecond) between each samples in the
+#define         CALIBRATION_SAMPLE_INTERVAL  5   //define the time interal(in milisecond) between each samples in the
                                                      //cablibration phase
 #define         READ_SAMPLE_INTERVAL         50    //define how many samples you are going to take in normal operation
 #define         READ_SAMPLE_TIMES            5     //define the time interal(in milisecond) between each samples in 
@@ -40,7 +40,7 @@ extern float lpg_val;
 extern float pm10_val;
 extern float methane_val ;
 extern float nh4_val;
-extern int air_quality_val;
+extern uint8_t air_quality_val;
 
 void MQInit();
 
