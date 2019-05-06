@@ -1,11 +1,11 @@
 # esp-homekit-air-quality-sensor
 
 
-Use an MQ135 to sens air quality, a DHT22 for temperature amnd humidity to help make the snro more accurate. 
+Uses an MQ135 to sense air quality, and a DHT22 for temperature and humidity to help make the sensor more accurate. 
 
-The MQ135 sensor is  capable of providing:-
+The MQ135 sensor is capable of providing:-
 
-Air Quality 
+Air Quality
 PM10 density
 Carbon monoxide level
 LPG (custom characteristic only visbile in Eve)
