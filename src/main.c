@@ -24,7 +24,7 @@
 #define DEVICE_MODEL "1"
 #define DEVICE_SERIAL "12345678"
 #define FW_VERSION "1.0"
-#define TEMPERATURE_SENSOR_PIN 4
+#define TEMPERATURE_SENSOR_GPIO 5
 #define TEMPERATURE_POLL_PERIOD 10000
 
 #include <stdio.h>
@@ -230,11 +230,11 @@ void temperature_sensor_task(void *_args) {
     
     bool success;
     
-    gpio_set_pullup(TEMPERATURE_SENSOR_PIN, false, false);
+    /*gpio_set_pullup(TEMPERATURE_SENSOR_GPIO, false, false); */
     
     while (1) {
         success = dht_read_float_data(
-                                      DHT_TYPE_DHT22, TEMPERATURE_SENSOR_PIN,
+                                      DHT_TYPE_DHT22, TEMPERATURE_SENSOR_GPIO,
                                       &humidity_value, &temperature_value
                                       );
         
@@ -255,6 +255,7 @@ void temperature_sensor_task(void *_args) {
 }
 
 void temperature_sensor_init() {
+    gpio_enable(TEMPERATURE_SENSOR_GPIO, GPIO_INPUT);
     xTaskCreate(temperature_sensor_task, "Temperature", 256, NULL, 2, NULL);
 }
 
@@ -317,9 +318,9 @@ void air_quality_sensor_task(void *_args) {
         homekit_characteristic_notify(&carbon_monoxide_level, HOMEKIT_FLOAT(co_val));
         homekit_characteristic_notify(&pm10_density, HOMEKIT_FLOAT(pm10_val));
         homekit_characteristic_notify(&air_quality, air_quality.value);
-        homekit_characteristic_notify(&carbon_monoxide_level, HOMEKIT_FLOAT(lpg_val));
-        homekit_characteristic_notify(&carbon_monoxide_level, HOMEKIT_FLOAT(lpg_val));
-        homekit_characteristic_notify(&carbon_monoxide_level, HOMEKIT_FLOAT(lpg_val));
+        homekit_characteristic_notify(&lpg_level, HOMEKIT_FLOAT(lpg_val));
+        homekit_characteristic_notify(&methane_level, HOMEKIT_FLOAT(methane_val));
+        homekit_characteristic_notify(&ammonium_level, HOMEKIT_FLOAT(nh4_val));
         vTaskDelay(3000 / portTICK_PERIOD_MS);
     }
 }
