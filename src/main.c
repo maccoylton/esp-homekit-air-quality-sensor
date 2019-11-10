@@ -59,7 +59,7 @@
 
 const int LED_GPIO = 13;
 const int RESET_BUTTON_GPIO = 0;
-
+bool accessory_paired = false;
 
 /* global varibale to support LEDs set to 0 wehre the LED is connected to GND, 1 where +3.3v */
 int led_off_value=1;
@@ -348,6 +348,10 @@ void on_homekit_event(homekit_event_t event) {
             break;
         case HOMEKIT_EVENT_CLIENT_VERIFIED:
             printf("on_homekit_event: Client verified\n");
+            if (!accessory_paired ){
+                accessory_paired = true;
+                accessory_init();
+            }
             break;
         case HOMEKIT_EVENT_CLIENT_DISCONNECTED:
             printf("on_homekit_event: Client disconnected\n");
@@ -425,7 +429,6 @@ void user_init(void) {
     
     printf ("User Init\n");
     standard_init();
-    accessory_init();
     
     wifi_config_init("AirQualitySensor", NULL, on_wifi_ready);
     
