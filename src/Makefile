@@ -4,10 +4,13 @@ EXTRA_COMPONENTS = \
 	extras/dht \
 	extras/http-parser \
 	extras/rboot-ota \
+	extras/dhcpserver \
 	$(abspath ../components/esp-wolfssl) \
 	$(abspath ../components/esp-cjson) \
 	$(abspath ../components/esp-homekit) \
-    $(abspath ../components/esp-homekit-common-functions/button)\
+	$(abspath ../components/esp-wifi-config) \
+    $(abspath ../components/UDPlogger)\
+    $(abspath ../components/esp-adv-button)\
     $(abspath ../components/esp-homekit-common-functions/led_codes)\
     $(abspath ../components/esp-homekit-common-functions/ota)\
     $(abspath ../components/esp-homekit-common-functions/custom_characteristics)
@@ -20,9 +23,12 @@ HOMEKIT_SPI_FLASH_BASE_ADDR = 0x8c000
 HOMEKIT_MAX_CLIENTS = 16
 HOMEKIT_SMALL = 0
 
-EXTRA_CFLAGS += -I../.. -DHOMEKIT_SHORT_APPLE_UUIDS -DHOMEKIT_DEBUG
+EXTRA_CFLAGS += -I../.. -DHOMEKIT_SHORT_APPLE_UUIDS
 EXTRA_CFLAGS += -DHOMEKIT_OVERCLOCK_PAIR_VERIFY
 EXTRA_CFLAGS += -DHOMEKIT_OVERCLOCK_PAIR_SETUP
+EXTRA_CFLAGS += -DUDPLOG_PRINTF_ALSO_SERIAL
+#EXTRA_CFLAGS += -DHOMEKIT_DEBUG
+
 
 include $(SDK_PATH)/common.mk
 
