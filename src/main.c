@@ -64,7 +64,10 @@ bool accessory_paired = false;
 /* global varibale to support LEDs set to 0 wehre the LED is connected to GND, 1 where +3.3v */
 int led_off_value=1;
 
+void wifi_reset_set(homekit_value_t value);
 
+
+homekit_characteristic_t wifi_reset   = HOMEKIT_CHARACTERISTIC_(CUSTOM_WIFI_RESET, false, .setter=wifi_reset_set);
 homekit_characteristic_t ota_trigger      = API_OTA_TRIGGER;
 homekit_characteristic_t name             = HOMEKIT_CHARACTERISTIC_(NAME, DEVICE_NAME);
 homekit_characteristic_t manufacturer     = HOMEKIT_CHARACTERISTIC_(MANUFACTURER,  DEVICE_MANUFACTURER);
@@ -109,6 +112,12 @@ void identify(homekit_value_t _value) {
     xTaskCreate(identify_task, "identify", 128, NULL, 2, NULL);
 }
 
+void wifi_reset_set(homekit_value_t value){
+    printf("Resetting Wifi Config\n");
+    wifi_config_reset();
+    printf("Restarting\n");
+    sdk_system_restart();
+}
 
 void reset_configuration_task() {
     //Flash the LED first before we start the reset
@@ -180,6 +189,7 @@ homekit_accessory_t *accessories[] = {
             &methane_level,
             &ammonium_level,
             &ota_trigger,
+            &wifi_reset,
             NULL
         }),
         NULL
@@ -342,12 +352,18 @@ void on_homekit_event(homekit_event_t event) {
     switch (event) {
         case HOMEKIT_EVENT_SERVER_INITIALIZED:
             printf("on_homekit_event: Server initialised\n");
+            if (homekit_is_paired()){
+                /* if server has started and we already have a pairing then initialise*/
+                accessory_paired = true;
+                accessory_init();
+            }
             break;
         case HOMEKIT_EVENT_CLIENT_CONNECTED:
             printf("on_homekit_event: Client connected\n");
             break;
         case HOMEKIT_EVENT_CLIENT_VERIFIED:
             printf("on_homekit_event: Client verified\n");
+            /* we weren't paired on started up but we now are */
             if (!accessory_paired ){
                 accessory_paired = true;
                 accessory_init();
@@ -362,7 +378,7 @@ void on_homekit_event(homekit_event_t event) {
         case HOMEKIT_EVENT_PAIRING_REMOVED:
             printf("on_homekit_event: Pairing removed\n");
             if (!homekit_is_paired())
-                /* if we have no more pairtings then restart */
+                /* if we have no more pairings then restart */
                 printf("on_homekit_event: no more pairings so restart\n");
                 sdk_system_restart();
             break;
