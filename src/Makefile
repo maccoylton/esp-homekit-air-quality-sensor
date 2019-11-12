@@ -13,7 +13,9 @@ EXTRA_COMPONENTS = \
     $(abspath ../components/esp-adv-button)\
     $(abspath ../components/esp-homekit-common-functions/led_codes)\
     $(abspath ../components/esp-homekit-common-functions/ota)\
-    $(abspath ../components/esp-homekit-common-functions/custom_characteristics)
+    $(abspath ../components/esp-homekit-common-functions/custom_characteristics)\
+    $(abspath ../components/esp-homekit-common-functions/shared_functions)
+
 
 FLASH_SIZE = 8
 FLASH_MODE = dout

@@ -49,6 +49,8 @@
 #include <wifi_config.h>
 #include <adv_button.h>
 #include <udplogger.h>
+#include <shared_functions.h>
+
 
 // add this section to make your device OTA capable
 // create the extra characteristic &ota_trigger, at the end of the primary service (before the NULL)
@@ -59,12 +61,11 @@
 
 const int LED_GPIO = 13;
 const int RESET_BUTTON_GPIO = 0;
-bool accessory_paired = false;
+const int status_led_gpio = 13;
 
 /* global varibale to support LEDs set to 0 wehre the LED is connected to GND, 1 where +3.3v */
 int led_off_value=1;
 
-void wifi_reset_set(homekit_value_t value);
 
 
 homekit_characteristic_t wifi_reset   = HOMEKIT_CHARACTERISTIC_(CUSTOM_WIFI_RESET, false, .setter=wifi_reset_set);
@@ -99,61 +100,6 @@ homekit_characteristic_t ammonium_level             = HOMEKIT_CHARACTERISTIC_( C
 
 float humidity_value, temperature_value;
 TaskHandle_t temperature_sensor_task_handle, air_quality_sensor_task_handle;
-
-
-
-void identify_task(void *_args) {
-    led_code (LED_GPIO, IDENTIFY_ACCESSORY);
-    vTaskDelete(NULL);
-}
-
-void identify(homekit_value_t _value) {
-    printf("identify\n");
-    xTaskCreate(identify_task, "identify", 128, NULL, 2, NULL);
-}
-
-void wifi_reset_set(homekit_value_t value){
-    printf("Resetting Wifi Config\n");
-    wifi_config_reset();
-    printf("Restarting\n");
-    sdk_system_restart();
-}
-
-void reset_configuration_task() {
-    //Flash the LED first before we start the reset
-    led_code (LED_GPIO, WIFI_CONFIG_RESET);
-    
-
-    printf("Resetting Wifi Config\n");
-    
-    wifi_config_reset();
-    sysparam_set_bool("init", true);
-    
-    vTaskDelay(1000 / portTICK_PERIOD_MS);
-    
-    printf("Resetting HomeKit Config\n");
-    
-    homekit_server_reset();
-    
-    vTaskDelay(1000 / portTICK_PERIOD_MS);
-    
-    printf("Restarting\n");
-    
-    sdk_system_restart();
-    
-    vTaskDelete(NULL);
-}
-
-void reset_configuration() {
-    printf ("reset_configuration");
-/*    vTaskDelete (temperature_sensor_task_handle);
-    vTaskDelete (air_quality_sensor_task_handle);
-    printf("reset_configuration: task create resetconfiguration\n");
- */
-    xTaskCreate(reset_configuration_task, "Reset configuration", 256, NULL, 2, NULL);
-}
-
-
 
 homekit_accessory_t *accessories[] = {
     HOMEKIT_ACCESSORY(.id=1, .category=homekit_accessory_category_sensor, .services=(homekit_service_t*[]){
@@ -196,35 +142,6 @@ homekit_accessory_t *accessories[] = {
     }),
     NULL
 };
-
-
-void create_accessory_name() {
-    
-    int serialLength = snprintf(NULL, 0, "%d", sdk_system_get_chip_id());
-    
-    char *serialNumberValue = malloc(serialLength + 1);
-    
-    snprintf(serialNumberValue, serialLength + 1, "%d", sdk_system_get_chip_id());
-    
-    int name_len = snprintf(NULL, 0, "%s-%s-%s",
-                            DEVICE_NAME,
-                            DEVICE_MODEL,
-                            serialNumberValue);
-    
-    if (name_len > 63) {
-        name_len = 63;
-    }
-    
-    char *name_value = malloc(name_len + 1);
-    
-    snprintf(name_value, name_len + 1, "%s-%s-%s",
-             DEVICE_NAME, DEVICE_MODEL, serialNumberValue);
-    
-    
-    name.value = HOMEKIT_STRING(name_value);
-    serial.value = name.value;
-}
-
 
 void temperature_sensor_task(void *_args) {
     
@@ -332,61 +249,12 @@ void air_quality_sensor_init() {
     xTaskCreate(air_quality_sensor_init_task, "Air Quality init", 512, NULL, 2, NULL);
 }
 
-void reset_button_callback(uint8_t gpio, void* args) {
-    
-    printf("Reset Button event long press on GPIO : %d\n", gpio);
-    reset_configuration();
-    
-}
-
-
 void accessory_init(){
     
     air_quality_sensor_init();
     temperature_sensor_init();
 }
 
-
-void on_homekit_event(homekit_event_t event) {
-
-    switch (event) {
-        case HOMEKIT_EVENT_SERVER_INITIALIZED:
-            printf("on_homekit_event: Server initialised\n");
-            if (homekit_is_paired()){
-                /* if server has started and we already have a pairing then initialise*/
-                accessory_paired = true;
-                accessory_init();
-            }
-            break;
-        case HOMEKIT_EVENT_CLIENT_CONNECTED:
-            printf("on_homekit_event: Client connected\n");
-            break;
-        case HOMEKIT_EVENT_CLIENT_VERIFIED:
-            printf("on_homekit_event: Client verified\n");
-            /* we weren't paired on started up but we now are */
-            if (!accessory_paired ){
-                accessory_paired = true;
-                accessory_init();
-            }
-            break;
-        case HOMEKIT_EVENT_CLIENT_DISCONNECTED:
-            printf("on_homekit_event: Client disconnected\n");
-            break;
-        case HOMEKIT_EVENT_PAIRING_ADDED:
-            printf("on_homekit_event: Pairing added\n");
-            break;
-        case HOMEKIT_EVENT_PAIRING_REMOVED:
-            printf("on_homekit_event: Pairing removed\n");
-            if (!homekit_is_paired())
-                /* if we have no more pairings then restart */
-                printf("on_homekit_event: no more pairings so restart\n");
-                sdk_system_restart();
-            break;
-        default:
-            printf("on_homekit_event: Default event %d ", event);
-    }
-
-}
 
 homekit_server_config_t config = {
     .accessories = accessories,
@@ -396,47 +264,23 @@ homekit_server_config_t config = {
 };
 
 
-
-void on_wifi_ready ( void) {
-
-    printf("on_wifi_ready\n");
-
-    homekit_server_init(&config);
-        
-}
-
-
-void standard_init (){
+void gpio_init (){
     
-    uart_set_baud(0, 115200);
-    printf( "Standard Init \n");
-    get_sysparam_info();
-    udplog_init(3);
-    
-    /* https://github.com/RavenSystem/esp-adv-button */
-    
-    const uint8_t toggle_press = 0, single_press = 1, double_press = 2,  long_press = 3, very_long_press = 4, hold_press = 5;
-    
+
     adv_button_set_evaluate_delay(10);
     
     /* GPIO for button, pull-up resistor, inverted */
     printf("Initialising reset buttons\n");
     
     adv_button_create(RESET_BUTTON_GPIO, true, false);
-    adv_button_register_callback_fn(RESET_BUTTON_GPIO, reset_button_callback, very_long_press, NULL);
+    adv_button_register_callback_fn(RESET_BUTTON_GPIO, reset_button_callback, VERYLONGPRESS_TYPE, NULL, 0);
     
     
     printf("Initialising led\n");
     gpio_enable(LED_GPIO, GPIO_OUTPUT);
     gpio_write(LED_GPIO, led_off_value);
     
-    int c_hash=ota_read_sysparam(&manufacturer.value.string_value,&serial.value.string_value,
-                                 &model.value.string_value,&revision.value.string_value);
-    
-    if (c_hash==0) c_hash=1;
-    config.accessories[0]->config_number=c_hash;
-    
-    create_accessory_name();
+
     
 }
 
@@ -444,7 +288,7 @@ void user_init(void) {
 
     
     printf ("User Init\n");
-    standard_init();
+    gpio_init();
     
     wifi_config_init("AirQualitySensor", NULL, on_wifi_ready);
     
