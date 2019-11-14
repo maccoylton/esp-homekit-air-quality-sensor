@@ -28,3 +28,4 @@ The DHT22 temperature sensor is connected to GPIO5
 
 There is also an LED connected to GPIO13. This should be connected to +3v though a suitable resistor for your led. 
 
+![alt text](https://github.com/maccoylton/esp-homekit-air-quality-sensor/blob/master/Air%20Quality%20Sensor_bb.jpg)
