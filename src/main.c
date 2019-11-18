@@ -250,9 +250,13 @@ void air_quality_sensor_init() {
 }
 
 void accessory_init(){
-    
+    /* initalise anything you don't want started until wifi and pairing is confirmed */
     air_quality_sensor_init();
     temperature_sensor_init();
+}
+
+void accessory_init_not_paired (void) {
+    /* initalise anything you don't want started until wifi and homekit imitialisation is confirmed, but not paired */
 }
 
 
@@ -288,6 +292,9 @@ void user_init(void) {
 
     
     printf ("User Init\n");
+    
+    standard_init (&name, &manufacturer, &model, &serial, &revision);
+    
     gpio_init();
     
     wifi_config_init("AirQualitySensor", NULL, on_wifi_ready);
