@@ -262,6 +262,19 @@ void accessory_init_not_paired (void) {
     /* initalise anything you don't want started until wifi and homekit imitialisation is confirmed, but not paired */
 }
 
+void recover_from_reset (int reason){
+    /* called if we restarted abnormally */
+    printf ("%s: reason %d\n", __func__, reason);
+}
+
+void save_characteristics (){
+    
+    /* called if we restarted abnormally */
+    printf ("%s:\n", __func__);
+    save_characteristic_to_flash(&wifi_check_interval, wifi_check_interval.value);
+
+}
+
 
 homekit_server_config_t config = {
     .accessories = accessories,
