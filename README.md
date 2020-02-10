@@ -1,3 +1,6 @@
+![GitHub All Releases](https://img.shields.io/github/downloads/maccoylton/esp-homekit-air-quality-sensor/total) 
+![GitHub Releases](https://img.shields.io/github/downloads/maccoylton/esp-homekit-air-quality-sensor/latest/total)
+
 # esp-homekit-air-quality-sensor
 
 
