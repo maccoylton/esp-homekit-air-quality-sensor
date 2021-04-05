@@ -71,6 +71,12 @@ int led_off_value=1;
 homekit_characteristic_t wifi_reset   = HOMEKIT_CHARACTERISTIC_(CUSTOM_WIFI_RESET, false, .setter=wifi_reset_set);
 homekit_characteristic_t wifi_check_interval   = HOMEKIT_CHARACTERISTIC_(CUSTOM_WIFI_CHECK_INTERVAL, 10, .setter=wifi_check_interval_set);
 /* checks the wifi is connected and flashes status led to indicated connected */
+
+homekit_characteristic_t task_stats   = HOMEKIT_CHARACTERISTIC_(CUSTOM_TASK_STATS, false , .setter=task_stats_set);
+
+homekit_characteristic_t ota_beta     = HOMEKIT_CHARACTERISTIC_(CUSTOM_OTA_BETA, false, .setter=ota_beta_set);
+homekit_characteristic_t lcm_beta    = HOMEKIT_CHARACTERISTIC_(CUSTOM_LCM_BETA, false, .setter=lcm_beta_set);
+
 homekit_characteristic_t ota_trigger      = API_OTA_TRIGGER;
 homekit_characteristic_t name             = HOMEKIT_CHARACTERISTIC_(NAME, DEVICE_NAME);
 homekit_characteristic_t manufacturer     = HOMEKIT_CHARACTERISTIC_(MANUFACTURER,  DEVICE_MANUFACTURER);
@@ -139,6 +145,9 @@ homekit_accessory_t *accessories[] = {
             &ota_trigger,
             &wifi_reset,
             &wifi_check_interval,
+            &task_stats,
+            &ota_beta,
+            &lcm_beta,
             NULL
         }),
         NULL
@@ -242,7 +251,7 @@ void air_quality_sensor_task(void *_args) {
 
 void air_quality_sensor_init_task (void *_args) {
     MQInit();
-    xTaskCreate(air_quality_sensor_task, "Air Quality Sensor", 512, NULL, 2, &air_quality_sensor_task_handle);
+    xTaskCreate(air_quality_sensor_task, "Air Quality Sensor", 300, NULL, 2, &air_quality_sensor_task_handle);
     vTaskDelete (NULL);
 }
 
@@ -252,41 +261,12 @@ void air_quality_sensor_init() {
     xTaskCreate(air_quality_sensor_init_task, "Air Quality init", 512, NULL, 2, NULL);
 }
 
-void accessory_init(){
-    /* initalise anything you don't want started until wifi and pairing is confirmed */
-    air_quality_sensor_init();
-    temperature_sensor_init();
-}
-
-void accessory_init_not_paired (void) {
-    /* initalise anything you don't want started until wifi and homekit imitialisation is confirmed, but not paired */
-}
-
-void recover_from_reset (int reason){
-    /* called if we restarted abnormally */
-    printf ("%s: reason %d\n", __func__, reason);
-}
-
-void save_characteristics (){
-    
-    /* called if we restarted abnormally */
-    printf ("%s:\n", __func__);
-    save_characteristic_to_flash(&wifi_check_interval, wifi_check_interval.value);
-
-}
-
-
-homekit_server_config_t config = {
-    .accessories = accessories,
-    .password = "111-11-111",
-    .setupId = "1234",
-    .on_event = on_homekit_event
-};
-
 
 void gpio_init (){
     
-
+    
+    printf("%s: Start, Freep Heap=%d\n", __func__, xPortGetFreeHeapSize());
+    
     adv_button_set_evaluate_delay(10);
     
     /* GPIO for button, pull-up resistor, inverted */
@@ -300,21 +280,55 @@ void gpio_init (){
     gpio_enable(LED_GPIO, GPIO_OUTPUT);
     gpio_write(LED_GPIO, led_off_value);
     
-
-    
+    printf("%s: End, Freep Heap=%d\n", __func__, xPortGetFreeHeapSize());
 }
+
+
+void accessory_init(){
+    /* initalise anything you don't want started until wifi and pairing is confirmed */
+    printf("%s: Start, Freep Heap=%d\n", __func__, xPortGetFreeHeapSize());
+
+    gpio_init();
+    air_quality_sensor_init();
+    temperature_sensor_init();
+
+    printf("%s: End, Freep Heap=%d\n", __func__, xPortGetFreeHeapSize());
+}
+
+
+void accessory_init_not_paired (void) {
+    /* initalise anything you don't want started until wifi and homekit imitialisation is confirmed, but not paired */
+}
+
+
+void recover_from_reset (int reason){
+    /* called if we restarted abnormally */
+    printf ("%s: reason %d\n", __func__, reason);
+}
+
+
+void save_characteristics (){
+    
+    /* called if we restarted abnormally */
+    printf ("%s:\n", __func__);
+    save_characteristic_to_flash(&wifi_check_interval, wifi_check_interval.value);
+}
+
+
+homekit_server_config_t config = {
+    .accessories = accessories,
+    .password = "111-11-111",
+    .setupId = "1234",
+    .on_event = on_homekit_event
+};
+
 
 void user_init(void) {
 
-    
     printf ("User Init\n");
     
     standard_init (&name, &manufacturer, &model, &serial, &revision);
     
-    gpio_init();
-    
     wifi_config_init(DEVICE_NAME, NULL, on_wifi_ready);
-    
-    
 }
 

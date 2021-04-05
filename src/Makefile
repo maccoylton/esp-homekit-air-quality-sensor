@@ -5,7 +5,6 @@ EXTRA_COMPONENTS = \
 	extras/http-parser \
 	extras/rboot-ota \
 	extras/dhcpserver \
-    extras/rboot-ota\
 	$(abspath ../components/esp-wolfssl) \
 	$(abspath ../components/esp-cjson) \
 	$(abspath ../components/esp-homekit) \
@@ -32,14 +31,14 @@ EXTRA_CFLAGS += -DHOMEKIT_OVERCLOCK_PAIR_SETUP
 EXTRA_CFLAGS += -DUDPLOG_PRINTF_TO_UDP
 EXTRA_CFLAGS += -DUDPLOG_PRINTF_ALSO_SERIAL
 #EXTRA_CFLAGS += -DHOMEKIT_DEBUG
-
+EXTRA_CFLAGS += -DconfigUSE_TRACE_FACILITY
 
 include $(SDK_PATH)/common.mk
 
 LIBS+=m
 
 signature:
-	$(shell /usr/local/opt/openssl/bin/openssl   sha384 -binary -out firmware/main.bin.sig firmware/main.bin)
+	$(shell openssl   sha384 -binary -out firmware/main.bin.sig firmware/main.bin)
 	$(shell printf "%08x" `cat firmware/main.bin | wc -c`| xxd -r -p >>firmware/main.bin.sig)
  
 monitor:
